@@ -1,0 +1,95 @@
+name: Build Windows EXE
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+    - name: リポジトリを取得
+      uses: actions/checkout@v4
+
+    - name: Python 3.11 をセットアップ
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Tesseract OCR（日本語付き）をインストール
+      run: |
+        choco install tesseract --params="/Japanese" -y
+        echo "C:\Program Files\Tesseract-OCR" | Out-File -Append -FilePath $env:GITHUB_PATH
+
+    - name: Poppler をインストール
+      run: |
+        choco install poppler -y
+        # パスを追加（バージョンによって異なるため検索して追加）
+        $popplerBin = Get-ChildItem "C:\ProgramData\chocolatey\lib\poppler\tools" -Recurse -Filter "pdftoppm.exe" | Select-Object -First 1 -ExpandProperty DirectoryName
+        echo $popplerBin | Out-File -Append -FilePath $env:GITHUB_PATH
+
+    - name: Pythonライブラリをインストール
+      run: |
+        pip install --upgrade pip
+        pip install pikepdf pypdf pdf2image pillow pytesseract pyinstaller tkinterdnd2
+
+    - name: EXEをビルド
+      run: |
+        pyinstaller `
+          --onefile `
+          --windowed `
+          --name "橋梁点検PDFリンク追加ツール" `
+          --hidden-import "PIL._tkinter_finder" `
+          --collect-all "tkinterdnd2" `
+          bridge_pdf_link_app.py
+
+    - name: ビルド成果物をアップロード
+      uses: actions/upload-artifact@v4
+      with:
+        name: 橋梁点検PDFリンク追加ツール-Windows
+        path: dist/橋梁点検PDFリンク追加ツール.exe
+        retention-days: 30
+
+  build-mac:
+    runs-on: macos-latest
+
+    steps:
+    - name: リポジトリを取得
+      uses: actions/checkout@v4
+
+    - name: Python 3.11 をセットアップ
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+
+    - name: Tesseract OCR（日本語付き）をインストール
+      run: |
+        brew install tesseract tesseract-lang
+
+    - name: Poppler をインストール
+      run: |
+        brew install poppler
+
+    - name: Pythonライブラリをインストール
+      run: |
+        pip install --upgrade pip
+        pip install pikepdf pypdf pdf2image pillow pytesseract pyinstaller tkinterdnd2
+
+    - name: アプリをビルド
+      run: |
+        pyinstaller \
+          --onefile \
+          --windowed \
+          --name "橋梁点検PDFリンク追加ツール" \
+          --hidden-import "PIL._tkinter_finder" \
+          --collect-all "tkinterdnd2" \
+          bridge_pdf_link_app.py
+
+    - name: ビルド成果物をアップロード
+      uses: actions/upload-artifact@v4
+      with:
+        name: 橋梁点検PDFリンク追加ツール-Mac
+        path: dist/橋梁点検PDFリンク追加ツール
+        retention-days: 30
